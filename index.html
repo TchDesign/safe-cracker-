@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Safe Cracker ROM Game</title>
+<style>
+html,body{margin:0;padding:0;background:transparent;}
+</style>
+</head>
+<body>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+#scene{
+  background:#F9F5FA;border-radius:16px;width:100%;aspect-ratio:16/9;
+  position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;
+}
+#layout{
+  position:absolute;inset:0;
+  display:grid;
+  grid-template-columns:1fr 2.4fr 1fr;
+  grid-template-rows:auto 1fr auto;
+  padding:3.5% 4%;
+  gap:0;
+}
+#top-left{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:1px;}
+#top-centre{grid-column:2;grid-row:1;display:flex;justify-content:center;align-items:flex-start;}
+#top-right{grid-column:3;grid-row:1;display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+#mid{grid-column:1/4;grid-row:2;display:flex;align-items:center;justify-content:center;gap:4%;}
+#bot{grid-column:1/4;grid-row:3;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.hud-label{font-size:clamp(9px,1.2vw,11px);color:rgba(26,26,26,0.5);font-family:system-ui,sans-serif;letter-spacing:0.05em;text-transform:uppercase;}
+.hud-value{font-size:clamp(14px,2vw,20px);font-weight:700;color:#1a1a1a;font-family:system-ui,sans-serif;line-height:1.1;}
+#state-label{font-size:clamp(11px,1.5vw,14px);font-weight:400;color:#1a1a1a;font-family:system-ui,sans-serif;white-space:nowrap;opacity:0.8;}
+#feedback-label{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:clamp(18px,3vw,34px);font-weight:700;color:#ffffff;
+  letter-spacing:0.1em;opacity:0;font-family:Georgia,serif;
+  transition:opacity 0.2s;white-space:nowrap;pointer-events:none;
+  text-shadow:0 2px 16px rgba(0,0,0,0.22);z-index:10;
+}
+#hold-btn{
+  width:clamp(90px,15vw,140px);height:clamp(28px,4vw,38px);
+  border-radius:40px;border:1.5px solid #3A9E8F;
+  background:rgba(58,158,143,0.12);
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(11px,1.3vw,13px);font-weight:500;color:#1a1a1a;
+  font-family:system-ui,sans-serif;cursor:pointer;
+  transition:background 0.12s;touch-action:none;
+}
+#hold-btn.pressed{background:rgba(58,158,143,0.32);border-color:#2a8070;}
+#angle-bar{width:100%;display:flex;align-items:center;gap:7px;}
+#bar-track{flex:1;position:relative;height:4px;background:rgba(26,26,26,0.12);border-radius:4px;}
+#bar-fill{height:100%;width:0%;background:#3A9E8F;border-radius:4px;}
+#zone-mark{position:absolute;top:-3px;height:10px;background:rgba(58,158,143,0.22);border:1px solid #3A9E8F;border-radius:2px;pointer-events:none;transition:left 0.3s,width 0.3s;}
+#angle-pip{position:absolute;top:-5px;width:3px;height:14px;background:#1a1a1a;border-radius:2px;transform:translateX(-50%);left:0%;}
+.bar-end{font-size:10px;color:rgba(26,26,26,0.45);font-family:system-ui,sans-serif;}
+#deg-readout{font-size:clamp(11px,1.4vw,13px);font-weight:500;min-width:32px;text-align:right;color:#1a1a1a;font-family:system-ui,sans-serif;}
+#hint{font-size:clamp(9px,1.1vw,11px);color:rgba(26,26,26,0.4);font-family:system-ui,sans-serif;text-align:center;}
+@keyframes starRay{0%{opacity:1;transform:scale(0.3);}70%{opacity:0.9;transform:scale(1);}100%{opacity:0;transform:scale(1.4);}}
+@keyframes ringPulse{0%,100%{stroke-opacity:0.9;}50%{stroke-opacity:0.2;}}
+@keyframes bounce{0%{transform:scale(1);}30%{transform:scale(1.12);}60%{transform:scale(0.95);}100%{transform:scale(1);}}
+@keyframes dialUnlock{0%{transform:rotate(0deg);}25%{transform:rotate(12deg);}50%{transform:rotate(-8deg);}75%{transform:rotate(5deg);}100%{transform:rotate(0deg);}}
+@keyframes safeOpen{0%{transform:scaleX(1);}100%{transform:scaleX(0);transform-origin:left;}}
+@keyframes scoreFloat{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-36px);}}
+.star-ray{opacity:0;}
+.star-ray.burst{animation:starRay 0.55s ease-out forwards;}
+.rd0{animation-delay:0s;}.rd1{animation-delay:0.03s;}.rd2{animation-delay:0.06s;}.rd3{animation-delay:0.09s;}
+.rd4{animation-delay:0.12s;}.rd5{animation-delay:0.05s;}.rd6{animation-delay:0.08s;}.rd7{animation-delay:0.02s;}
+#glow-ring{stroke-opacity:0;transition:stroke-opacity 0.3s;}
+#glow-ring.active{animation:ringPulse 0.9s ease-in-out infinite;}
+#joint-group.bounce{animation:bounce 0.45s ease-out forwards;}
+.dial-group.unlocked{animation:dialUnlock 0.4s ease-out forwards;}
+.score-float{
+  position:absolute;font-weight:700;font-family:Georgia,serif;pointer-events:none;
+  animation:scoreFloat 1s ease-out forwards;font-size:clamp(13px,1.8vw,18px);
+}
+</style>
+
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Safe Cracker ROM game. Press and hold to flex joint. Hit each dial's target angle and hold 5 seconds to unlock it. Crack all 5 dials to open the safe.</h2>
+
+<div id="scene">
+<div id="layout">
+
+  <div id="top-left">
+    <span class="hud-label">Dials</span>
+    <span class="hud-value"><span id="unlocked-count">0</span>/5</span>
+  </div>
+  <div id="top-centre">
+    <span id="state-label">Press &amp; hold to begin</span>
+  </div>
+  <div id="top-right">
+    <span class="hud-label">Score</span>
+    <span class="hud-value" id="score-num">0</span>
+  </div>
+
+  <div id="mid">
+
+    <!-- JOINT -->
+    <svg viewBox="0 0 120 220" fill="none" style="width:16%;max-width:110px;flex-shrink:0;overflow:visible;">
+      <g id="star-group" transform="translate(60,85)">
+        <line class="star-ray rd0" x1="0" y1="-20" x2="0" y2="-42" stroke="#00E5BE" stroke-width="2.5" stroke-linecap="round"/>
+        <line class="star-ray rd1" x1="14" y1="-14" x2="30" y2="-30" stroke="#00E5BE" stroke-width="2" stroke-linecap="round"/>
+        <line class="star-ray rd2" x1="20" y1="0" x2="42" y2="0" stroke="#00E5BE" stroke-width="2.5" stroke-linecap="round"/>
+        <line class="star-ray rd3" x1="14" y1="14" x2="30" y2="30" stroke="#00E5BE" stroke-width="2" stroke-linecap="round"/>
+        <line class="star-ray rd4" x1="0" y1="20" x2="0" y2="42" stroke="#00E5BE" stroke-width="2.5" stroke-linecap="round"/>
+        <line class="star-ray rd5" x1="-14" y1="14" x2="-30" y2="30" stroke="#00E5BE" stroke-width="2" stroke-linecap="round"/>
+        <line class="star-ray rd6" x1="-20" y1="0" x2="-42" y2="0" stroke="#00E5BE" stroke-width="2.5" stroke-linecap="round"/>
+        <line class="star-ray rd7" x1="-14" y1="-14" x2="-30" y2="-30" stroke="#00E5BE" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <circle id="glow-ring" cx="60" cy="85" r="22" stroke="#00E5BE" stroke-width="3" fill="none"/>
+      <g id="joint-group" style="transform-origin:60px 85px;">
+        <rect x="51" y="10" width="18" height="75" rx="9" fill="#9DBDD0"/>
+        <ellipse cx="60" cy="85" rx="14" ry="14" fill="#8BB0C4"/>
+        <ellipse cx="60" cy="85" rx="8" ry="8" fill="#9DBDD0"/>
+        <g id="lower-seg" style="transform-origin:60px 85px;">
+          <rect x="51" y="85" width="18" height="75" rx="9" fill="#9DBDD0"/>
+        </g>
+      </g>
+      <text id="angle-disp" x="60" y="212" text-anchor="middle" fill="#1a1a1a" font-size="11" font-family="system-ui,sans-serif" opacity="0.55">0°</text>
+    </svg>
+
+    <!-- SAFE -->
+    <svg id="safe-svg" viewBox="0 0 300 220" fill="none" style="width:52%;max-width:340px;flex-shrink:0;overflow:visible;">
+
+      <!-- safe body -->
+      <rect x="10" y="10" width="280" height="200" rx="14" fill="#9DBDD0"/>
+      <rect x="18" y="18" width="264" height="184" rx="10" fill="#8BB0C4"/>
+
+      <!-- door seam — hides when opened -->
+      <rect id="door-seam" x="18" y="18" width="264" height="184" rx="10" fill="#7AA5BE" opacity="0.4"/>
+
+      <!-- handle bar -->
+      <rect x="130" y="100" width="40" height="10" rx="5" fill="#3A9E8F"/>
+      <circle cx="130" cy="105" r="7" fill="#3A9E8F"/>
+      <circle cx="170" cy="105" r="7" fill="#3A9E8F"/>
+
+      <!-- 5 dials evenly spaced -->
+      <!-- dial positions: x = 38,88,150,212,262  y=105 -->
+
+      <g id="dial-0" class="dial-group" style="transform-origin:38px 105px;">
+        <circle cx="38" cy="105" r="20" fill="#B8D0DC" stroke="#3A9E8F" stroke-width="1.5"/>
+        <circle cx="38" cy="105" r="13" fill="#9DBDD0"/>
+        <line x1="38" y1="92" x2="38" y2="99" stroke="#3A9E8F" stroke-width="2.5" stroke-linecap="round"/>
+        <circle id="dial-dot-0" cx="38" cy="92" r="3" fill="#3A9E8F"/>
+        <text id="dial-label-0" x="38" y="136" text-anchor="middle" fill="#1a1a1a" font-size="9" font-family="system-ui,sans-serif" opacity="0.7">30°</text>
+        <circle id="dial-check-0" cx="38" cy="105" r="20" fill="none" stroke="#00E5BE" stroke-width="0" opacity="0"/>
+      </g>
+
+      <g id="dial-1" class="dial-group" style="transform-origin:88px 105px;">
+        <circle cx="88" cy="105" r="20" fill="#B8D0DC" stroke="#3A9E8F" stroke-width="1.5"/>
+        <circle cx="88" cy="105" r="13" fill="#9DBDD0"/>
+        <line x1="88" y1="92" x2="88" y2="99" stroke="#3A9E8F" stroke-width="2.5" stroke-linecap="round"/>
+        <circle id="dial-dot-1" cx="88" cy="92" r="3" fill="#3A9E8F"/>
+        <text id="dial-label-1" x="88" y="136" text-anchor="middle" fill="#1a1a1a" font-size="9" font-family="system-ui,sans-serif" opacity="0.7">45°</text>
+        <circle id="dial-check-1" cx="88" cy="105" r="20" fill="none" stroke="#00E5BE" stroke-width="0" opacity="0"/>
+      </g>
+
+      <g id="dial-2" class="dial-group" style="transform-origin:150px 105px;">
+        <circle cx="150" cy="105" r="20" fill="#B8D0DC" stroke="#3A9E8F" stroke-width="1.5"/>
+        <circle cx="150" cy="105" r="13" fill="#9DBDD0"/>
+        <line x1="150" y1="92" x2="150" y2="99" stroke="#3A9E8F" stroke-width="2.5" stroke-linecap="round"/>
+        <circle id="dial-dot-2" cx="150" cy="92" r="3" fill="#3A9E8F"/>
+        <text id="dial-label-2" x="150" y="136" text-anchor="middle" fill="#1a1a1a" font-size="9" font-family="system-ui,sans-serif" opacity="0.7">60°</text>
+        <circle id="dial-check-2" cx="150" cy="105" r="20" fill="none" stroke="#00E5BE" stroke-width="0" opacity="0"/>
+      </g>
+
+      <g id="dial-3" class="dial-group" style="transform-origin:212px 105px;">
+        <circle cx="212" cy="105" r="20" fill="#B8D0DC" stroke="#3A9E8F" stroke-width="1.5"/>
+        <circle cx="212" cy="105" r="13" fill="#9DBDD0"/>
+        <line x1="212" y1="92" x2="212" y2="99" stroke="#3A9E8F" stroke-width="2.5" stroke-linecap="round"/>
+        <circle id="dial-dot-3" cx="212" cy="92" r="3" fill="#3A9E8F"/>
+        <text id="dial-label-3" x="212" y="136" text-anchor="middle" fill="#1a1a1a" font-size="9" font-family="system-ui,sans-serif" opacity="0.7">75°</text>
+        <circle id="dial-check-3" cx="212" cy="105" r="20" fill="none" stroke="#00E5BE" stroke-width="0" opacity="0"/>
+      </g>
+
+      <g id="dial-4" class="dial-group" style="transform-origin:262px 105px;">
+        <circle cx="262" cy="105" r="20" fill="#B8D0DC" stroke="#3A9E8F" stroke-width="1.5"/>
+        <circle cx="262" cy="105" r="13" fill="#9DBDD0"/>
+        <line x1="262" y1="92" x2="262" y2="99" stroke="#3A9E8F" stroke-width="2.5" stroke-linecap="round"/>
+        <circle id="dial-dot-4" cx="262" cy="92" r="3" fill="#3A9E8F"/>
+        <text id="dial-label-4" x="262" y="136" text-anchor="middle" fill="#1a1a1a" font-size="9" font-family="system-ui,sans-serif" opacity="0.7">90°</text>
+        <circle id="dial-check-4" cx="262" cy="105" r="20" fill="none" stroke="#00E5BE" stroke-width="0" opacity="0"/>
+      </g>
+
+      <!-- hold arc for current active dial — drawn per dial in JS -->
+      <circle id="active-arc" cx="150" cy="105" r="22"
+        stroke="#00E5BE" stroke-width="3" stroke-linecap="round"
+        stroke-dasharray="138.2" stroke-dashoffset="138.2"
+        transform="rotate(-90 150 105)" fill="none" opacity="0"/>
+
+      <!-- safe open overlay — green flash -->
+      <rect id="open-flash" x="18" y="18" width="264" height="184" rx="10" fill="#00E5BE" opacity="0"/>
+
+    </svg>
+
+  </div>
+
+  <div id="bot">
+    <div id="hold-btn">Hold to flex</div>
+    <div id="angle-bar">
+      <span class="bar-end">0°</span>
+      <div id="bar-track">
+        <div id="bar-fill"></div>
+        <div id="zone-mark"></div>
+        <div id="angle-pip"></div>
+      </div>
+      <span class="bar-end">120°</span>
+      <span id="deg-readout">0°</span>
+    </div>
+    <div id="hint">hold → flex joint · hit each dial's angle · hold 5s to unlock · crack all 5 to open the safe</div>
+  </div>
+
+</div>
+<div id="feedback-label">SAFE CRACKED!</div>
+</div>
+
+<script>
+const holdBtn=document.getElementById('hold-btn');
+const stateLabel=document.getElementById('state-label');
+const feedbackLabel=document.getElementById('feedback-label');
+const scoreNum=document.getElementById('score-num');
+const unlockedCount=document.getElementById('unlocked-count');
+const lowerSeg=document.getElementById('lower-seg');
+const angleDisp=document.getElementById('angle-disp');
+const glowRing=document.getElementById('glow-ring');
+const jointGroup=document.getElementById('joint-group');
+const rays=document.querySelectorAll('.star-ray');
+const barFill=document.getElementById('bar-fill');
+const zoneMark=document.getElementById('zone-mark');
+const anglePip=document.getElementById('angle-pip');
+const degReadout=document.getElementById('deg-readout');
+const activeArc=document.getElementById('active-arc');
+const openFlash=document.getElementById('open-flash');
+const scene=document.getElementById('scene');
+
+const DIALS=[
+  {target:30,margin:6,cx:38,cy:105},
+  {target:45,margin:6,cx:88,cy:105},
+  {target:60,margin:5,cx:150,cy:105},
+  {target:75,margin:5,cx:212,cy:105},
+  {target:90,margin:4,cx:262,cy:105},
+];
+const HOLD_MS=5000;
+const ARC_CIRC=138.2; // 2π×22
+const MAX_DEG=120;
+
+let isHeld=false,deg=0,vel=0;
+let currentDial=0;
+let unlockedDials=0;
+let holdStart=null,cooldown=false,gameWon=false;
+let lastState='idle',feedbackTimeout=null,score=0;
+
+function pressStart(e){e.preventDefault();isHeld=true;holdBtn.classList.add('pressed');}
+function pressEnd(e){e.preventDefault();isHeld=false;holdBtn.classList.remove('pressed');}
+holdBtn.addEventListener('mousedown',pressStart);
+holdBtn.addEventListener('touchstart',pressStart,{passive:false});
+document.addEventListener('mouseup',pressEnd);
+document.addEventListener('touchend',pressEnd);
+document.addEventListener('contextmenu',e=>e.preventDefault());
+
+function updateZoneBar(dial){
+  const lo=(dial.target-dial.margin)/MAX_DEG*100;
+  const hi=(dial.target+dial.margin)/MAX_DEG*100;
+  zoneMark.style.left=lo+'%';
+  zoneMark.style.width=(hi-lo)+'%';
+}
+
+function positionArc(dial){
+  activeArc.setAttribute('cx',dial.cx);
+  activeArc.setAttribute('cy',dial.cy);
+  activeArc.setAttribute('transform',`rotate(-90 ${dial.cx} ${dial.cy})`);
+  activeArc.style.opacity='0';
+  activeArc.setAttribute('stroke-dashoffset',ARC_CIRC);
+}
+
+function unlockDial(i){
+  const dialG=document.getElementById('dial-'+i);
+  const check=document.getElementById('dial-check-'+i);
+  const dot=document.getElementById('dial-dot-'+i);
+  dialG.classList.add('unlocked');
+  check.setAttribute('stroke-width','3');
+  check.style.opacity='1';
+  dot.setAttribute('fill','#00E5BE');
+  setTimeout(()=>dialG.classList.remove('unlocked'),500);
+}
+
+function flashOpen(){
+  let op=0.5;
+  openFlash.style.opacity=op;
+  const fade=setInterval(()=>{
+    op-=0.05;
+    if(op<=0){openFlash.style.opacity=0;clearInterval(fade);}
+    else openFlash.style.opacity=op;
+  },40);
+}
+
+function fireBurst(){
+  rays.forEach(r=>{r.classList.remove('burst');void r.offsetWidth;r.classList.add('burst');});
+  jointGroup.classList.remove('bounce');void jointGroup.offsetWidth;jointGroup.classList.add('bounce');
+}
+
+function showFeedback(word,dur=1600){
+  feedbackLabel.textContent=word;feedbackLabel.style.opacity='1';
+  if(feedbackTimeout)clearTimeout(feedbackTimeout);
+  feedbackTimeout=setTimeout(()=>feedbackLabel.style.opacity='0',dur);
+}
+
+function floatScore(pts){
+  const f=document.createElement('div');
+  f.className='score-float';f.textContent='+'+pts;
+  f.style.top='30%';f.style.left='54%';
+  f.style.color='#00C4A0';
+  scene.appendChild(f);setTimeout(()=>f.remove(),1100);
+}
+
+function nextDial(){
+  if(currentDial>=DIALS.length){winGame();return;}
+  updateZoneBar(DIALS[currentDial]);
+  positionArc(DIALS[currentDial]);
+  stateLabel.textContent='Dial '+(currentDial+1)+'/5 — aim for '+DIALS[currentDial].target+'°';
+  lastState='next';
+}
+
+function winGame(){
+  gameWon=true;
+  flashOpen();
+  fireBurst();
+  showFeedback('SAFE CRACKED!',3000);
+  stateLabel.textContent='All 5 dials unlocked!';
+  score+=10;scoreNum.textContent=score;
+  floatScore(10);
+}
+
+function completeDial(){
+  holdStart=null;activeArc.style.opacity='0';activeArc.setAttribute('stroke-dashoffset',ARC_CIRC);
+  cooldown=true;
+  unlockDial(currentDial);fireBurst();
+  const pts=5;score+=pts;scoreNum.textContent=score;
+  unlockedDials++;unlockedCount.textContent=unlockedDials;
+  floatScore(pts);
+  showFeedback('CLICK!');
+  currentDial++;
+  setTimeout(()=>{
+    cooldown=false;
+    nextDial();
+  },1000);
+}
+
+// init
+updateZoneBar(DIALS[0]);
+positionArc(DIALS[0]);
+
+function loop(){
+  if(gameWon){requestAnimationFrame(loop);return;}
+
+  if(isHeld){vel+=(DIALS[currentDial<DIALS.length?currentDial:0].target-deg)*0.045;vel*=0.78;}
+  else{vel+=(-deg)*0.06;vel*=0.72;}
+  deg+=vel;deg=Math.max(0,Math.min(MAX_DEG,deg));
+
+  const dr=Math.round(deg);
+  lowerSeg.style.transform=`rotate(${deg.toFixed(2)}deg)`;
+  angleDisp.textContent=dr+'°';degReadout.textContent=dr+'°';
+  const pct=(deg/MAX_DEG*100).toFixed(1);
+  barFill.style.width=pct+'%';anglePip.style.left=pct+'%';
+
+  if(currentDial>=DIALS.length){requestAnimationFrame(loop);return;}
+  const dial=DIALS[currentDial];
+  const inZone=!cooldown&&Math.abs(deg-dial.target)<=dial.margin;
+
+  if(inZone&&isHeld){
+    glowRing.classList.add('active');
+    if(holdStart===null){holdStart=performance.now();activeArc.style.opacity='1';}
+    const el=performance.now()-holdStart;
+    const prog=Math.min(el/HOLD_MS,1);
+    activeArc.setAttribute('stroke-dashoffset',(ARC_CIRC*(1-prog)).toFixed(2));
+    if(el>=HOLD_MS)completeDial();
+    if(lastState!=='holding'){stateLabel.textContent='Steady… hold 5s — dial '+(currentDial+1)+'/5';lastState='holding';}
+  } else {
+    glowRing.classList.remove('active');
+    if(holdStart!==null&&!cooldown){holdStart=null;activeArc.style.opacity='0';activeArc.setAttribute('stroke-dashoffset',ARC_CIRC);}
+    if(!cooldown){
+      if(!isHeld&&deg<2){if(lastState!=='idle'){stateLabel.textContent='Press & hold to begin';lastState='idle';}}
+      else if(isHeld&&deg<dial.target-dial.margin){if(lastState!=='low'){stateLabel.textContent='Keep flexing… aim for '+dial.target+'°';lastState='low';}}
+      else if(isHeld&&deg>dial.target+dial.margin){if(lastState!=='high'){stateLabel.textContent='Ease back to '+dial.target+'°';lastState='high';}}
+      else if(!isHeld&&deg>2){if(lastState!=='spring'){stateLabel.textContent='Hold to reach '+dial.target+'°';lastState='spring';}}
+    }
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body></html>
