@@ -13,7 +13,7 @@ html,body{margin:0;padding:0;background:transparent;}
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 #scene{
-  background:#F9F5FA;border-radius:16px;width:100%;aspect-ratio:16/9;
+  background:#F5F9FA;border-radius:16px;width:100%;aspect-ratio:16/9;
   position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;
 }
 #layout{
@@ -339,7 +339,7 @@ function completeDial(){
   const pts=5;score+=pts;scoreNum.textContent=score;
   unlockedDials++;unlockedCount.textContent=unlockedDials;
   floatScore(pts);
-  showFeedback('CLICK!');
+  showFeedback('MOVE & HOLD');
   currentDial++;
   setTimeout(()=>{
     cooldown=false;
